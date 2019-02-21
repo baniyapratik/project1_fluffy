@@ -1,0 +1,22 @@
+# linux backup files
+*~
+
+# Metadata
+.DS_Store
+
+# Java
+*.class
+
+# Packages
+*.jar
+*.war
+*.ear
+
+# GIT
+.git/
+
+# Logfiles
+.log
+
+# JME (binaries)
+*.so

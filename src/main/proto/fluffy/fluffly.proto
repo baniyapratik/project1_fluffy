@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package fluffy;
+
+option java_package = "com.proto.fluffy";
+option java_multiple_files = true;
+
+message Text {
+    string id = 1;
+    string content = 2;
+    string description = 3;
+}
+
+message createTextRequest {
+    Text text = 1;
+}
+
+message createTextResponse {
+    Text text = 1;
+}
+
+message readTextRequest {
+    string text_id = 1;
+}
+
+message readTextResponse {
+    Text text = 1;
+}
+
+message deleteTextRequest {
+    string text_id = 1;
+}
+
+message deleteTextResponse {
+    string text_id = 1;
+}
+
+message listTextRequest {}
+
+message listTextResponse {
+    Text text = 1;
+}
+
+message updateTextRequest {
+    Text text = 1;
+}
+
+message updateTextResponse {
+    Text text = 1;
+}
+
+service TextService {
+    // return NOT_FOUND if not text_id is not found
+    rpc CreateText(createTextRequest) returns (createTextResponse){};
+    rpc ReadText(readTextRequest) returns (readTextResponse){};
+    rpc UpdateText(updateTextRequest) returns (updateTextResponse){};
+    rpc DeleteText(deleteTextRequest) returns (deleteTextResponse){};
+    rpc ListText(listTextRequest) returns (stream listTextResponse){};
+}
