@@ -1,81 +1,130 @@
 package com.project1.fluffy.client;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import com.google.protobuf.ByteString;
 import com.proto.fluffy.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 
 public class FluffyClient {
+	private final ManagedChannel channel;
+	private final DataServiceGrpc.DataServiceBlockingStub dataClient;
+	private final DataServiceGrpc.DataServiceStub asyncStub;
+	private Random random = new Random();
 
-    public static void main(String[] args) {
-        System.out.println("Project one application");
-        FluffyClient main = new FluffyClient();
-        main.run();
-    }
+	public static void main(String[] args) {
+		System.out.println("Project one application");
+		FluffyClient main = new FluffyClient();
+		main.run();
+	}
 
-    private void run(){
-        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 50051)
-                .usePlaintext()
-                .build();
+	public FluffyClient() {
+		channel = ManagedChannelBuilder.forAddress("localhost", 50051).usePlaintext().build();
+		dataClient = DataServiceGrpc.newBlockingStub(channel);
+		asyncStub = DataServiceGrpc.newStub(channel);
+	}
 
-        TextServiceGrpc.TextServiceBlockingStub textClient = TextServiceGrpc.newBlockingStub(channel);
-        textClientCalls(textClient);
-    }
+	private void run() {
+		try {
+			saveFile("C:\\IA2013\\IAClasses.zip");
+		} catch (UnsupportedEncodingException | InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 
-    private void textClientCalls(TextServiceGrpc.TextServiceBlockingStub textClient){
+	private void saveFile(String filePath) throws InterruptedException, UnsupportedEncodingException {
+		final CountDownLatch finishLatch = new CountDownLatch(1);
+		StreamObserver<saveDataResponse> responseObserver = new StreamObserver<saveDataResponse>() {
+			@Override
+			public void onNext(saveDataResponse response) {
+				String responseStatus = response.getResponse();
+				System.out.println("Received " + responseStatus);
+				if (responseStatus.equals("Error")) {
+					finishLatch.countDown();
+				}
+			}
 
-        // Creating a new Text
-        Text text = Text.newBuilder()
-                .setContent("Hello world")
-                .setDescription("First Text being sent")
-                .build();
+			@Override
+			public void onError(Throwable t) {
+				System.out.println(Status.fromThrowable(t));
+				finishLatch.countDown();
+			}
 
-        createTextResponse textResponse = textClient.createText(
-                createTextRequest.newBuilder().setText(text).build()
-        );
+			@Override
+			public void onCompleted() {
+				System.out.println("Finished sending file");
+				finishLatch.countDown();
+			}
+		};
 
-        System.out.println("Received create Text Response");
-        System.out.println(textResponse.toString());
+		StreamObserver<saveDataRequest> requestObserver = asyncStub.saveData(responseObserver);
+		Data chunk = null;
+		FileInputStream is = null;
+		File file = null;
+		long bytesRead = 0;
+		try {
+			file = new File(filePath);
+			is = new FileInputStream(file);
+			byte[] chunkByteArray = new byte[1024];
+			int chunkLen = 0;
+			bytesRead = 0;
+			while ((chunkLen = is.read(chunkByteArray)) != -1) {
+				chunk = Data.newBuilder().setData(ByteString.copyFrom(chunkByteArray))
+						.setKey(file.getName())
+						.setStartByte(bytesRead)
+						.setLen(chunkLen)
+						.build();
 
+				bytesRead += chunkLen;
+				saveDataRequest dataRequest = saveDataRequest.newBuilder().setData(chunk).build();
+				requestObserver.onNext(dataRequest);
+				if (finishLatch.getCount() == 0) {
+					// RPC completed or errored before we finished sending.
+					// Sending further requests won't error, but they will just be thrown away.
+					System.out.println("Ended sending prematurely");
+					throw new RuntimeException("Server ended file stream early");
+				}
+			}
+		} catch (FileNotFoundException e) {
 
-        // reading text based on given id
-        String textId = textResponse.getText().getId();
+		} catch (IOException e) {
 
-        System.out.println("Reading text's....");
+		} catch (RuntimeException e) {
+			// Cancel RPC
+			requestObserver.onError(e);
+			throw e;
+		} finally {
+			if (is != null) {
+				try {
+					is.close();
+				} catch (IOException e) {
+					// do nothing
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		if (file != null && bytesRead == file.length()) {
+			requestObserver.onCompleted();
+		}
 
-        readTextResponse readTextResponse = textClient.readText(readTextRequest.newBuilder()
-                .setTextId(textId)
-                .build());
-
-        System.out.println(readTextResponse.toString());
-
-
-        // updating the text data ..
-
-        Text newText = Text.newBuilder()
-                .setId(textId)
-                .setContent("Updated Content")
-                .setDescription("Updated Description")
-                .build();
-        updateTextResponse updateTextResponse = textClient.updateText(
-                updateTextRequest.newBuilder().setText(newText).build()
-        );
-        System.out.println("Received Updated Text Response");
-        System.out.println(updateTextResponse.toString());
-
-
-        // deleting a text data ..
-        System.out.println("Received Delete Text Response");
-        deleteTextResponse deleteTextResponse = textClient.deleteText(
-                deleteTextRequest.newBuilder().setTextId(textId).build());
-        System.out.println("Text Data deleted");
-
-
-        // list all the data in TextData collections
-        // stream of List Text response
-        System.out.println("Received List Text Response");
-        textClient.listText(listTextRequest.newBuilder().build()).forEachRemaining(
-                listTextResponse -> System.out.println(listTextResponse.getText().toString())
-        );
-
-    }
+		// Receiving happens asynchronously
+		if (!finishLatch.await(1, TimeUnit.MINUTES)) {
+			System.out.println("recordRoute can not finish within 1 minutes");
+		}
+	}
 }
