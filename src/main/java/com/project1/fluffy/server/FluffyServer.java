@@ -12,24 +12,30 @@ import java.util.Hashtable;
 import com.proto.fluffy.*;
 
 public class FluffyServer {
-	private final Server server;
-
-	public FluffyServer() {
-		server = ServerBuilder.forPort(50051).addService(new DataService()).build();
+	private final Server _server;
+	private String _baseDir;
+	
+	public FluffyServer(int portNumber) {
+		// create baseDirectory which is port number, this will store uploaded files
+		_baseDir = Integer.toString(portNumber);
+		new File(_baseDir).mkdirs();
+		_server = ServerBuilder.forPort(portNumber).addService(new DataService(_baseDir)).build();
 	}
 
 	public void start() throws IOException, InterruptedException {
-		server.start();
+		_server.start();
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			System.out.println("Received shutdown Request");
-			server.shutdown();
+			_server.shutdown();
 			System.out.println("Successfully stopped the server");
 		}));
-		server.awaitTermination();
+		_server.awaitTermination();
 	}
 
 	public static void main(String[] args) {
-		FluffyServer server = new FluffyServer();
+		// start server at port given as argument
+		FluffyServer server = new FluffyServer(Integer.parseInt(args[0]));
+		
 		try {
 			server.start();
 		} catch (IOException e) {
@@ -40,62 +46,70 @@ public class FluffyServer {
 	}
 
 	private static class DataService extends DataServiceGrpc.DataServiceImplBase {
-		Hashtable<String, Object[]> fileUploaders = new Hashtable();
+		// Hash table to store upload id with corresponding server to know where to forward data chunk
+		Hashtable<String, Object[]> _fileUploaders = new Hashtable();
 		int uploadId = 0;
+		private String _baseDir;
 
-		DataService() {
+		DataService(String baseDir) {
+			_baseDir = baseDir;
 		}
 
 		@Override
 		public void sendChunk(sendChunkRequest request, StreamObserver<sendChunkResponse> responseObserver) {
+			// get data chunk request from load balancer
 			FileOutputStream fileOutputStream = null;
 
 			ChunkInfo chunkInfo = request.getChunkInfo();
 			String fileKey = chunkInfo.getKey();
 			String uploadId = Integer.toString(chunkInfo.getUploadId());
-			Object[] uploadInfo = fileUploaders.get(uploadId);
+			
+			// look up if upload id has corresponding output stream for their uploaded file
+			// if not assign it a new one and add entry to hash table
+			Object[] uploadInfo = _fileUploaders.get(uploadId);
 			try {
 				if (uploadInfo == null) {
-					fileOutputStream = new FileOutputStream(fileKey + ".tmp");
+					File targetDir = new File(_baseDir);
+					fileOutputStream = new FileOutputStream(new File(targetDir, fileKey + ".tmp"));
 					fileOutputStream.write(chunkInfo.getData().toByteArray(), 0, chunkInfo.getLen());
 					if (chunkInfo.getIsEnd() == false) {
-						fileUploaders.put(uploadId, new Object[] { fileKey, fileOutputStream });
+						_fileUploaders.put(uploadId, new Object[] { fileKey, fileOutputStream });
 					}
 				} else {
 					fileOutputStream = (FileOutputStream) uploadInfo[1];
 					fileOutputStream.write(chunkInfo.getData().toByteArray(), 0, chunkInfo.getLen());
 				}
 
+				// if client sent last bytes to server then copy then rename tmp file to actual file and close the stream
+				// also remove uploadid from hash table as we are now finished receiving the uploaded file
 				if (chunkInfo.getIsEnd()) {
 					fileOutputStream.close();
-					File uploadedFile = new File(fileKey);
-					File tmpFile = new File(fileKey + ".tmp");
-					System.out.println(uploadedFile.getAbsolutePath());
-					System.out.println(tmpFile.getAbsolutePath());
+					File baseDir = new File(_baseDir);
+					File uploadedFile = new File(baseDir, fileKey);
+					File tmpFile = new File(baseDir,  fileKey + ".tmp");
 					tmpFile.renameTo(uploadedFile);
-					deleteTmpFile(fileKey);
-					fileUploaders.remove(uploadId);
+					_fileUploaders.remove(uploadId);
 				}
 				responseObserver.onNext(sendChunkResponse.newBuilder().setResponse("OK").build());
 			} catch (IOException e) {
+				// if error occurs close file stream and remove uploadid from hash table
+				if (fileOutputStream != null) {
+					try {
+						fileOutputStream.close();
+					} catch (IOException e1) {
+						// ignore
+						e1.printStackTrace();
+					}
+				}
+				
+				if (uploadInfo != null) {
+					_fileUploaders.remove(uploadId);
+				}
+				
 				System.out.println("Error " + e.getMessage());
 				responseObserver.onNext(sendChunkResponse.newBuilder().setResponse("ERROR").build());
 			}
 			responseObserver.onCompleted();
-		}
-
-		@Override
-		public void getUploadId(getUploadIdRequest request, StreamObserver<getUploadIdResponse> responseObserver) {
-			responseObserver.onNext(getUploadIdResponse.newBuilder().setUploadId(uploadId).build());
-			responseObserver.onCompleted();
-			uploadId++;
-		}
-
-		public void deleteTmpFile(String fileKey) {
-			File createdTmpFile = new File(fileKey + ".tmp");
-			if (createdTmpFile.exists()) {
-				createdTmpFile.delete();
-			}
 		}
 	}
 }

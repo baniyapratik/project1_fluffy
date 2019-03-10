@@ -29,10 +29,13 @@ public class FluffyClient {
 	}
 
 	private void saveFile(String filePath) {
+		// get Unique uploadId from load balancer. This is used by the load balancer to keep track of which server has file
+		// as well as by the server to keep track of the corresponding FileOutputStream
 		int uploadId = dataClient.getUploadId(getUploadIdRequest.newBuilder().build()).getUploadId();
 		ChunkInfo chunkInfo = null;
 		FileInputStream is = null;
 		File file = null;
+		// chunk the file to support uploading larger files
 		try {
 			file = new File(filePath);
 			is = new FileInputStream(file);
