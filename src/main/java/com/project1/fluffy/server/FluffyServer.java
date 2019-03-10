@@ -7,6 +7,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Hashtable;
 
 import com.proto.fluffy.*;
 
@@ -32,78 +33,69 @@ public class FluffyServer {
 		try {
 			server.start();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 
 	private static class DataService extends DataServiceGrpc.DataServiceImplBase {
-		DataService() {
+		Hashtable<String, Object[]> fileUploaders = new Hashtable();
+		int uploadId = 0;
 
+		DataService() {
 		}
 
 		@Override
-		public StreamObserver<saveDataRequest> saveData(final StreamObserver<saveDataResponse> responseObserver) {
+		public void sendChunk(sendChunkRequest request, StreamObserver<sendChunkResponse> responseObserver) {
+			FileOutputStream fileOutputStream = null;
 
-			return new StreamObserver<saveDataRequest>() {
-				FileOutputStream fileOutputStream = null;
-				String fileKey = null;
-				@Override
-				public void onNext(saveDataRequest dataRequest) {
-					Data dataInfo = dataRequest.getData();
-					try {
-						if (dataInfo.getStartByte() == 0) {
-							fileKey = dataInfo.getKey();
-							fileOutputStream = new FileOutputStream(fileKey + ".tmp");
-						}
-						fileOutputStream.write(dataInfo.getData().toByteArray(), 0, dataInfo.getLen());
-					} catch (IOException e) {
-						responseObserver.onNext(saveDataResponse.newBuilder().setResponse("Error").build());
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+			ChunkInfo chunkInfo = request.getChunkInfo();
+			String fileKey = chunkInfo.getKey();
+			String uploadId = Integer.toString(chunkInfo.getUploadId());
+			Object[] uploadInfo = fileUploaders.get(uploadId);
+			try {
+				if (uploadInfo == null) {
+					fileOutputStream = new FileOutputStream(fileKey + ".tmp");
+					fileOutputStream.write(chunkInfo.getData().toByteArray(), 0, chunkInfo.getLen());
+					if (chunkInfo.getIsEnd() == false) {
+						fileUploaders.put(uploadId, new Object[] { fileKey, fileOutputStream });
 					}
+				} else {
+					fileOutputStream = (FileOutputStream) uploadInfo[1];
+					fileOutputStream.write(chunkInfo.getData().toByteArray(), 0, chunkInfo.getLen());
 				}
 
-				@Override
-				public void onError(Throwable t) {
-					System.out.println("Error: " + t.getMessage());
-					try {
-						fileOutputStream.close();
-						deleteTmpFile();
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
+				if (chunkInfo.getIsEnd()) {
+					fileOutputStream.close();
+					File uploadedFile = new File(fileKey);
+					File tmpFile = new File(fileKey + ".tmp");
+					System.out.println(uploadedFile.getAbsolutePath());
+					System.out.println(tmpFile.getAbsolutePath());
+					tmpFile.renameTo(uploadedFile);
+					deleteTmpFile(fileKey);
+					fileUploaders.remove(uploadId);
 				}
+				responseObserver.onNext(sendChunkResponse.newBuilder().setResponse("OK").build());
+			} catch (IOException e) {
+				System.out.println("Error " + e.getMessage());
+				responseObserver.onNext(sendChunkResponse.newBuilder().setResponse("ERROR").build());
+			}
+			responseObserver.onCompleted();
+		}
 
-				@Override
-				public void onCompleted() {
-					try {
-						fileOutputStream.close();
-						File createdTmpFile = new File(fileKey + ".tmp");
-						File createdFile = new File(fileKey);
-						createdTmpFile.renameTo(createdFile);
-						deleteTmpFile();
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					responseObserver.onNext(saveDataResponse.newBuilder().setResponse("Ok").build());
-					responseObserver.onCompleted();
-				}
-				
-				public void deleteTmpFile() {
-					File createdTmpFile = new File(fileKey + ".tmp");
-					if (createdTmpFile.exists()) {
-						createdTmpFile.delete();
-					}
-				}
-				
-			};
+		@Override
+		public void getUploadId(getUploadIdRequest request, StreamObserver<getUploadIdResponse> responseObserver) {
+			responseObserver.onNext(getUploadIdResponse.newBuilder().setUploadId(uploadId).build());
+			responseObserver.onCompleted();
+			uploadId++;
+		}
+
+		public void deleteTmpFile(String fileKey) {
+			File createdTmpFile = new File(fileKey + ".tmp");
+			if (createdTmpFile.exists()) {
+				createdTmpFile.delete();
+			}
 		}
 	}
-
 }

@@ -5,31 +5,30 @@ package fluffy;
 option java_package = "com.proto.fluffy";
 option java_multiple_files = true;
 
-message Data {
+message ChunkInfo {
     string key = 1;
-    int32 len = 2;
-    int64 startByte = 3;
-    bytes data = 4;
+    bytes data = 2;
+    bool isEnd = 3;
+    int32 uploadId = 4;
+    int32 len = 5;
 }
 
-message saveDataRequest {
-    Data data = 1;
+message sendChunkRequest {
+    ChunkInfo chunkInfo = 1;
 }
 
-message saveDataResponse {
+message sendChunkResponse {
 	string response = 1;
 }
 
-message getDataRequest {
-    Data data = 1;
+message getUploadIdRequest {
 }
 
-message getDataResponse {
-    bytes data = 1;
-    string response = 2;
+message getUploadIdResponse {
+	int32 uploadId = 1;
 }
 
 service DataService {
-    // return NOT_FOUND if not text_id is not found
-    rpc SaveData(stream saveDataRequest) returns (saveDataResponse){};
-    rpc GetData(getDataRequest) returns (getDataResponse){};}
+    rpc GetUploadId(getUploadIdRequest) returns (getUploadIdResponse){};
+    rpc SendChunk(sendChunkRequest) returns (sendChunkResponse){};
+}
