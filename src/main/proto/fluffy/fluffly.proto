@@ -5,55 +5,30 @@ package fluffy;
 option java_package = "com.proto.fluffy";
 option java_multiple_files = true;
 
-message Text {
-    string id = 1;
-    string content = 2;
-    string description = 3;
+message ChunkInfo {
+    string key = 1;
+    bytes data = 2;
+    bool isEnd = 3;
+    int32 uploadId = 4;
+    int32 len = 5;
 }
 
-message createTextRequest {
-    Text text = 1;
+message sendChunkRequest {
+    ChunkInfo chunkInfo = 1;
 }
 
-message createTextResponse {
-    Text text = 1;
+message sendChunkResponse {
+	string response = 1;
 }
 
-message readTextRequest {
-    string text_id = 1;
+message getUploadIdRequest {
 }
 
-message readTextResponse {
-    Text text = 1;
+message getUploadIdResponse {
+	int32 uploadId = 1;
 }
 
-message deleteTextRequest {
-    string text_id = 1;
-}
-
-message deleteTextResponse {
-    string text_id = 1;
-}
-
-message listTextRequest {}
-
-message listTextResponse {
-    Text text = 1;
-}
-
-message updateTextRequest {
-    Text text = 1;
-}
-
-message updateTextResponse {
-    Text text = 1;
-}
-
-service TextService {
-    // return NOT_FOUND if not text_id is not found
-    rpc CreateText(createTextRequest) returns (createTextResponse){};
-    rpc ReadText(readTextRequest) returns (readTextResponse){};
-    rpc UpdateText(updateTextRequest) returns (updateTextResponse){};
-    rpc DeleteText(deleteTextRequest) returns (deleteTextResponse){};
-    rpc ListText(listTextRequest) returns (stream listTextResponse){};
+service DataService {
+    rpc GetUploadId(getUploadIdRequest) returns (getUploadIdResponse){};
+    rpc SendChunk(sendChunkRequest) returns (sendChunkResponse){};
 }
