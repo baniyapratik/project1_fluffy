@@ -29,6 +29,7 @@ public class TextWriteServiceImpl extends TextWriteServiceGrpc.TextWriteServiceI
 
     @Override
     public void createText(createTextRequest request, StreamObserver<createTextResponse> responseObserver) {
+    	long startTime = System.nanoTime();
         System.out.println("Received Create Text request");
 
         Text text = request.getText();
@@ -50,11 +51,15 @@ public class TextWriteServiceImpl extends TextWriteServiceGrpc.TextWriteServiceI
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println(duration);
 
     }
 
     @Override
     public void updateText(updateTextRequest request, StreamObserver<updateTextResponse> responseObserver) {
+    	long startTime = System.nanoTime();
         System.out.println("Received an Update request");
 
         Text text = request.getText();
@@ -88,11 +93,14 @@ public class TextWriteServiceImpl extends TextWriteServiceGrpc.TextWriteServiceI
 
             responseObserver.onCompleted();
         }
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println(duration);
     }
 
     @Override
     public void deleteText(deleteTextRequest request, StreamObserver<deleteTextResponse> responseObserver) {
-
+    	long startTime = System.nanoTime();
         String textId = request.getTextId();
 
         try {
@@ -115,6 +123,8 @@ public class TextWriteServiceImpl extends TextWriteServiceGrpc.TextWriteServiceI
                 .build());
 
         responseObserver.onCompleted();
-
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println(duration);
     }
 }

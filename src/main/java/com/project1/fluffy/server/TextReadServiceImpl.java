@@ -29,6 +29,7 @@ public class TextReadServiceImpl extends TextReadServiceGrpc.TextReadServiceImpl
 
     @Override
     public void readText(readTextRequest request, StreamObserver<readTextResponse> responseObserver) {
+        long startTime = System.nanoTime();
 
         System.out.println("Read Text request received");
         String textId = request.getTextId();
@@ -54,17 +55,21 @@ public class TextReadServiceImpl extends TextReadServiceGrpc.TextReadServiceImpl
                     .build());
             responseObserver.onCompleted();
         }
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime);
+        System.out.println(duration);
     }
 
     @Override
     public void listText(listTextRequest request, StreamObserver<listTextResponse> responseObserver) {
         System.out.println("Received List Text Request");
-
-        collection.find().iterator().forEachRemaining(document -> responseObserver.onNext(
-                listTextResponse.newBuilder().setText(documentToText(document)).build()
-        ));
-
+        collection.find().iterator().forEachRemaining(document -> {
+        	long startTime = System.nanoTime();
+        	responseObserver.onNext(listTextResponse.newBuilder().setText(documentToText(document)).build());
+            long endTime = System.nanoTime();
+            long duration = (endTime - startTime);
+            System.out.println(duration);
+        });
         responseObserver.onCompleted();
-        
     }
 }
