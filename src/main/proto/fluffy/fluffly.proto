@@ -49,11 +49,15 @@ message updateTextResponse {
     Text text = 1;
 }
 
-service TextService {
+service TextReadService {
+    // return NOT_FOUND if not text_id is not found
+    rpc ReadText(readTextRequest) returns (readTextResponse){};
+    rpc ListText(listTextRequest) returns (stream listTextResponse){};
+}
+
+service TextWriteService {
     // return NOT_FOUND if not text_id is not found
     rpc CreateText(createTextRequest) returns (createTextResponse){};
-    rpc ReadText(readTextRequest) returns (readTextResponse){};
     rpc UpdateText(updateTextRequest) returns (updateTextResponse){};
     rpc DeleteText(deleteTextRequest) returns (deleteTextResponse){};
-    rpc ListText(listTextRequest) returns (stream listTextResponse){};
 }

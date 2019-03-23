@@ -13,7 +13,7 @@ import org.bson.types.ObjectId;
 
 import static com.mongodb.client.model.Filters.eq;
 
-public class TextServiceImpl extends TextServiceGrpc.TextServiceImplBase {
+public class TextWriteServiceImpl extends TextWriteServiceGrpc.TextWriteServiceImplBase {
 
     private MongoClient mongoClient = MongoClients.create("mongodb+srv://root:lab@project1-p9qiv.mongodb.net/test?retryWrites=true");
     private MongoDatabase database = mongoClient.getDatabase("test");
@@ -25,35 +25,6 @@ public class TextServiceImpl extends TextServiceGrpc.TextServiceImplBase {
                 .setDescription(document.getString("description"))
                 .setId(document.getObjectId("_id").toString())
                 .build();
-    }
-
-    @Override
-    public void readText(readTextRequest request, StreamObserver<readTextResponse> responseObserver) {
-
-        System.out.println("Read Text request received");
-        String textId = request.getTextId();
-
-        System.out.println("Searching for a Text");
-        Document result = collection.find(eq("_id", new ObjectId(textId))).first();
-
-        if (result == null) {
-            System.out.println("Text not found");
-            responseObserver.onError(
-                    Status.NOT_FOUND
-                    .withDescription("This Text with given id is not found")
-                    .asRuntimeException()
-            );
-        }
-        else{
-
-            System.out.println("Text found, sending response");
-            Text text = documentToText(result);
-            responseObserver.onNext(readTextResponse
-                    .newBuilder()
-                    .setText(text)
-                    .build());
-            responseObserver.onCompleted();
-        }
     }
 
     @Override
@@ -145,16 +116,5 @@ public class TextServiceImpl extends TextServiceGrpc.TextServiceImplBase {
 
         responseObserver.onCompleted();
 
-    }
-
-    @Override
-    public void listText(listTextRequest request, StreamObserver<listTextResponse> responseObserver) {
-        System.out.println("Received List Text Request");
-
-        collection.find().iterator().forEachRemaining(document -> responseObserver.onNext(
-                listTextResponse.newBuilder().setText(documentToText(document)).build()
-        ));
-
-        responseObserver.onCompleted();
     }
 }

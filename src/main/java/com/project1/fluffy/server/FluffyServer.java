@@ -9,7 +9,8 @@ public class FluffyServer {
     public static void main(String[] args) throws IOException, InterruptedException {
         System.out.println("Hello gRPC");
         Server server = ServerBuilder.forPort(50051)
-                .addService(new TextServiceImpl())
+                .addService(new TextReadServiceImpl())
+                .addService(new TextWriteServiceImpl())
                 .build();
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(()->{
@@ -19,5 +20,4 @@ public class FluffyServer {
         }));
         server.awaitTermination();
     }
-
 }

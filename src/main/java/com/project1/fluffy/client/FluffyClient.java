@@ -17,11 +17,13 @@ public class FluffyClient {
                 .usePlaintext()
                 .build();
 
-        TextServiceGrpc.TextServiceBlockingStub textClient = TextServiceGrpc.newBlockingStub(channel);
-        textClientCalls(textClient);
+        TextReadServiceGrpc.TextReadServiceBlockingStub textReadClient = TextReadServiceGrpc.newBlockingStub(channel);
+        TextWriteServiceGrpc.TextWriteServiceBlockingStub textWriteClient = TextWriteServiceGrpc.newBlockingStub(channel);
+        textClientCalls(textWriteClient, textReadClient);
     }
 
-    private void textClientCalls(TextServiceGrpc.TextServiceBlockingStub textClient){
+    private void textClientCalls(TextWriteServiceGrpc.TextWriteServiceBlockingStub textWriteClient,
+    		TextReadServiceGrpc.TextReadServiceBlockingStub textReadClient){
 
         // Creating a new Text
         Text text = Text.newBuilder()
@@ -29,7 +31,7 @@ public class FluffyClient {
                 .setDescription("First Text being sent")
                 .build();
 
-        createTextResponse textResponse = textClient.createText(
+        createTextResponse textResponse = textWriteClient.createText(
                 createTextRequest.newBuilder().setText(text).build()
         );
 
@@ -42,7 +44,7 @@ public class FluffyClient {
 
         System.out.println("Reading text's....");
 
-        readTextResponse readTextResponse = textClient.readText(readTextRequest.newBuilder()
+        readTextResponse readTextResponse = textReadClient.readText(readTextRequest.newBuilder()
                 .setTextId(textId)
                 .build());
 
@@ -56,7 +58,7 @@ public class FluffyClient {
                 .setContent("Updated Content")
                 .setDescription("Updated Description")
                 .build();
-        updateTextResponse updateTextResponse = textClient.updateText(
+        updateTextResponse updateTextResponse = textWriteClient.updateText(
                 updateTextRequest.newBuilder().setText(newText).build()
         );
         System.out.println("Received Updated Text Response");
@@ -65,7 +67,7 @@ public class FluffyClient {
 
         // deleting a text data ..
         System.out.println("Received Delete Text Response");
-        deleteTextResponse deleteTextResponse = textClient.deleteText(
+        deleteTextResponse deleteTextResponse = textWriteClient.deleteText(
                 deleteTextRequest.newBuilder().setTextId(textId).build());
         System.out.println("Text Data deleted");
 
@@ -73,7 +75,7 @@ public class FluffyClient {
         // list all the data in TextData collections
         // stream of List Text response
         System.out.println("Received List Text Response");
-        textClient.listText(listTextRequest.newBuilder().build()).forEachRemaining(
+        textReadClient.listText(listTextRequest.newBuilder().build()).forEachRemaining(
                 listTextResponse -> System.out.println(listTextResponse.getText().toString())
         );
 
